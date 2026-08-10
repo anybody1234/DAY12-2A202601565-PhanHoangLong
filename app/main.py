@@ -77,17 +77,14 @@ class AskRequest(BaseModel):
 def health():
     """Liveness probe — process còn sống không?
 
-    TODO (CP1 + CP4):
-      - Đang tắt dần (``lifecycle.shutting_down``) → trả
-        ``JSONResponse(status_code=503, content={"status": "shutting_down"})``
-      - Bình thường → ``{"status": "ok", "service": SERVICE_NAME,
-        "version": SERVICE_VERSION}`` (mặc định FastAPI trả 200).
-
-    Endpoint này phải **nhẹ**: không gọi Redis, không query DB. Nó chỉ trả
-    lời câu hỏi "có cần restart container này không?". Nếu nó phụ thuộc
-    Redis, Redis chết một nhịp là cả cụm container bị restart theo.
+    Không yêu cầu API key và không nhận dependency nào: platform tự gọi
+    endpoint này để quyết định có cần restart container không, và không
+    gửi kèm credential nào. Đang tắt dần (``lifecycle.shutting_down``) →
+    503. Bình thường → 200 ``{"status": "ok", ...}``.
     """
-    raise NotImplementedError("TODO (CP1/CP4): cài đặt /health")
+    if lifecycle.shutting_down:
+        return JSONResponse(status_code=503, content={"status": "shutting_down"})
+    return {"status": "ok", "service": SERVICE_NAME, "version": SERVICE_VERSION}
 
 
 @app.get("/ready")
@@ -102,7 +99,11 @@ def ready(store: ConversationStore = Depends(get_store)):
     Khác /health ở chỗ: endpoint này ĐƯỢC PHÉP kiểm tra dependency. Load
     balancer dùng nó để quyết định có đẩy request vào instance này không.
     """
-    raise NotImplementedError("TODO (CP4): cài đặt /ready")
+    if lifecycle.shutting_down:
+        return JSONResponse(status_code=503, content={"status": "shutting_down"})
+    if not store.ping():
+        return JSONResponse(status_code=503, content={"status": "not ready", "redis": False})
+    return {"status": "ready", "redis": True}
 
 
 # ─────────────────────────────────────────────────────────────

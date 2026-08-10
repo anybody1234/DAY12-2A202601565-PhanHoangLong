@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_PLACEHOLDER_VALUES = {"", "doi-thanh-khoa-cua-rieng-ban", "changeme"}
 
 
 class Settings(BaseSettings):
@@ -40,9 +43,20 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # TODO (CP1): khai báo 6 trường theo bảng trên, ví dụ:
-    #     port: int = 8000
-    #     agent_api_key: str
+    port: int = 8000
+    agent_api_key: str
+    redis_url: str = "redis://localhost:6379/0"
+    rate_limit_per_minute: int = 10
+    monthly_budget_usd: float = 10.0
+    log_level: str = "INFO"
+
+    @field_validator("agent_api_key")
+    @classmethod
+    def khong_duoc_rong_hoac_placeholder(cls, v: str) -> str:
+        """agent_api_key không được rỗng hoặc còn giá trị placeholder mẫu."""
+        if v.strip() in _PLACEHOLDER_VALUES:
+            raise ValueError("AGENT_API_KEY đang để trống hoặc còn giá trị placeholder")
+        return v
 
 
 @lru_cache(maxsize=1)
